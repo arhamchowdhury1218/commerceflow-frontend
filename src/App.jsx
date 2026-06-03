@@ -11,6 +11,7 @@ import NewOrder from "./pages/NewOrder";
 import Deliveries from "./pages/Deliveries";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
+import ResetPassword from "./pages/ResetPassword";
 
 // Protects routes that require login
 // If no token → redirect to /login
@@ -29,6 +30,7 @@ export default function App() {
         <Routes>
           {/* Public — no login needed */}
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected — must be logged in */}
           <Route

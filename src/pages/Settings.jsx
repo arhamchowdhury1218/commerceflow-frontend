@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   User,
   Building2,
   Truck,
   Mail,
+  Lock,
   Save,
   Loader2,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +29,7 @@ import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import useAuthStore from "@/store/authStore";
 import api from "@/lib/api";
 
+// ─── REUSABLE SECTION CARD ────────────────────────────────────────────────
 function SettingsSection({ icon: Icon, title, description, children }) {
   return (
     <motion.div
@@ -55,6 +60,7 @@ function SettingsSection({ icon: Icon, title, description, children }) {
   );
 }
 
+// ─── SAVE FEEDBACK MESSAGE ────────────────────────────────────────────────
 function SaveMessage({ message }) {
   if (!message) return null;
   const isSuccess = message.type === "success";
@@ -73,16 +79,20 @@ function SaveMessage({ message }) {
   );
 }
 
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────
 export default function Settings() {
-  const { user, setUser } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, setUser, logout } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
 
+  // ── Profile state ──────────────────────────────────────────────────────
   const [profileName, setProfileName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
 
+  // ── Business state ─────────────────────────────────────────────────────
   const [business, setBusiness] = useState({
     name: "",
     whatsapp_number: "",
@@ -92,9 +102,21 @@ export default function Settings() {
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [businessMsg, setBusinessMsg] = useState(null);
 
+  // ── Password state ─────────────────────────────────────────────────────
+  const [passForm, setPassForm] = useState({
+    current_password: "",
+    password: "",
+    password_confirmation: "",
+  });
+  const [savingPass, setSavingPass] = useState(false);
+  const [passMsg, setPassMsg] = useState(null);
+  const [showPassFields, setShowPassFields] = useState(false);
+
+  // ── SteadFast state ────────────────────────────────────────────────────
   const [testingSteadFast, setTestingSteadFast] = useState(false);
   const [steadFastMsg, setSteadFastMsg] = useState(null);
 
+  // ─── FETCH SETTINGS ──────────────────────────────────────────────────
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -116,12 +138,14 @@ export default function Settings() {
     fetchSettings();
   }, []);
 
+  // ─── SAVE PROFILE ────────────────────────────────────────────────────
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSavingProfile(true);
     setProfileMsg(null);
     try {
       const res = await api.put("/settings/profile", { name: profileName });
+      // Update global Zustand state so sidebar name updates immediately
       setUser({ ...user, name: res.data.user.name });
       setProfileMsg({ type: "success", text: "Profile updated!" });
     } catch (err) {
@@ -132,6 +156,7 @@ export default function Settings() {
     }
   };
 
+  // ─── SAVE BUSINESS ───────────────────────────────────────────────────
   const handleSaveBusiness = async (e) => {
     e.preventDefault();
     setSavingBusiness(true);
@@ -147,6 +172,59 @@ export default function Settings() {
     }
   };
 
+  // ─── CHANGE PASSWORD ─────────────────────────────────────────────────
+  const handlePassChange = (e) => {
+    setPassForm({ ...passForm, [e.target.name]: e.target.value });
+    setPassMsg(null);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+
+    if (passForm.password !== passForm.password_confirmation) {
+      setPassMsg({ type: "error", text: "New passwords do not match." });
+      return;
+    }
+
+    if (passForm.password.length < 8) {
+      setPassMsg({
+        type: "error",
+        text: "Password must be at least 8 characters.",
+      });
+      return;
+    }
+
+    setSavingPass(true);
+    setPassMsg(null);
+
+    try {
+      await api.put("/settings/password", passForm);
+      setPassMsg({
+        type: "success",
+        text: "Password changed! Logging you out...",
+      });
+      setPassForm({
+        current_password: "",
+        password: "",
+        password_confirmation: "",
+      });
+      // All tokens are invalidated on password change
+      // Log out and redirect to login after 2 seconds
+      setTimeout(() => {
+        logout();
+        navigate("/login");
+      }, 2000);
+    } catch (err) {
+      setPassMsg({
+        type: "error",
+        text: err.response?.data?.message || "Failed to change password.",
+      });
+    } finally {
+      setSavingPass(false);
+    }
+  };
+
+  // ─── TEST STEADFAST ───────────────────────────────────────────────────
   const handleTestSteadFast = async () => {
     setTestingSteadFast(true);
     setSteadFastMsg(null);
@@ -175,7 +253,7 @@ export default function Settings() {
         description="Manage your profile, business and integrations"
       />
 
-      {/* PROFILE */}
+      {/* ── PROFILE ─────────────────────────────────────────────────────── */}
       <SettingsSection
         icon={User}
         title="Your Profile"
@@ -226,7 +304,103 @@ export default function Settings() {
         </form>
       </SettingsSection>
 
-      {/* BUSINESS */}
+      {/* ── CHANGE PASSWORD ─────────────────────────────────────────────── */}
+      <SettingsSection
+        icon={Lock}
+        title="Change Password"
+        description="Update your account password — you will be logged out after changing"
+      >
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Current Password</label>
+            <div className="relative">
+              <Input
+                type={showPassFields ? "text" : "password"}
+                name="current_password"
+                placeholder="Your current password"
+                value={passForm.current_password}
+                onChange={handlePassChange}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassFields(!showPassFields)}
+                className="absolute right-3 top-1/2 -translate-y-1/2
+                           text-muted-foreground hover:text-foreground"
+              >
+                {showPassFields ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">New Password</label>
+            <Input
+              type={showPassFields ? "text" : "password"}
+              name="password"
+              placeholder="Min 8 characters"
+              value={passForm.password}
+              onChange={handlePassChange}
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Confirm New Password</label>
+            <Input
+              type={showPassFields ? "text" : "password"}
+              name="password_confirmation"
+              placeholder="Repeat new password"
+              value={passForm.password_confirmation}
+              onChange={handlePassChange}
+              required
+            />
+          </div>
+
+          {/* Warning note */}
+          <div
+            className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950
+                          border border-amber-200 dark:border-amber-800
+                          rounded-lg px-3 py-2.5"
+          >
+            <AlertCircle
+              className="w-3.5 h-3.5 text-amber-600
+                                    dark:text-amber-400 flex-shrink-0 mt-0.5"
+            />
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              After changing your password, you will be automatically logged out
+              and need to sign in again.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={savingPass}
+              className="gap-1.5"
+            >
+              {savingPass ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Changing...
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5" /> Change Password
+                </>
+              )}
+            </Button>
+            <SaveMessage message={passMsg} />
+          </div>
+        </form>
+      </SettingsSection>
+
+      {/* ── BUSINESS ────────────────────────────────────────────────────── */}
       <SettingsSection
         icon={Building2}
         title="Business Settings"
@@ -310,7 +484,7 @@ export default function Settings() {
         </form>
       </SettingsSection>
 
-      {/* STEADFAST */}
+      {/* ── STEADFAST ───────────────────────────────────────────────────── */}
       <SettingsSection
         icon={Truck}
         title="SteadFast Courier"
@@ -341,8 +515,8 @@ export default function Settings() {
 
         <div className="bg-muted/40 rounded-lg p-4 space-y-2">
           <p
-            className="text-xs font-medium text-muted-foreground
-                        uppercase tracking-wider"
+            className="text-xs font-medium text-muted-foreground uppercase
+                        tracking-wider"
           >
             API Keys Location
           </p>
@@ -388,7 +562,8 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => window.open("https://steadfast.com.bd", "_blank")}
-            className="flex items-center gap-1 text-xs text-primary hover:underline"
+            className="flex items-center gap-1 text-xs text-primary
+                       hover:underline"
           >
             SteadFast Portal
             <ExternalLink className="w-3 h-3" />
@@ -398,7 +573,7 @@ export default function Settings() {
         </div>
       </SettingsSection>
 
-      {/* EMAIL */}
+      {/* ── EMAIL ───────────────────────────────────────────────────────── */}
       <SettingsSection
         icon={Mail}
         title="Email Notifications"
@@ -427,8 +602,8 @@ export default function Settings() {
 
         <div className="bg-muted/40 rounded-lg p-4 space-y-2">
           <p
-            className="text-xs font-medium text-muted-foreground
-                        uppercase tracking-wider"
+            className="text-xs font-medium text-muted-foreground uppercase
+                        tracking-wider"
           >
             Emails sent automatically when
           </p>
@@ -455,8 +630,8 @@ export default function Settings() {
 
         <div className="bg-muted/40 rounded-lg p-4 space-y-2">
           <p
-            className="text-xs font-medium text-muted-foreground
-                        uppercase tracking-wider"
+            className="text-xs font-medium text-muted-foreground uppercase
+                        tracking-wider"
           >
             Mail Configuration
           </p>
