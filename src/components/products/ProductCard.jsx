@@ -1,21 +1,19 @@
 // src/components/products/ProductCard.jsx
 //
 // Product card layout:
-//   TOP    → product name, price, status badge, action buttons
+//   TOP    → product name, price, status badge, action buttons (Edit/Deactivate/Delete)
 //   MIDDLE → product images (thumbnails, click to open fullscreen)
 //   BOTTOM → stock info, expand/collapse variants table
 //
-// Name first so sellers can scan products quickly by name
-// Images below the name for visual reference
+// Edit button opens EditProductModal for full editing
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StockBadge from "./StockBadge";
 import ProductImageGallery from "./ProductImageGallery";
-import { Pencil } from "lucide-react";
 import EditProductModal from "./EditProductModal";
 
 export default function ProductCard({
@@ -23,8 +21,10 @@ export default function ProductCard({
   index,
   onDelete,
   onToggleStatus,
+  onSuccess,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   // ── STOCK CALCULATIONS ────────────────────────────────────────────────
   const totalStock =
@@ -43,7 +43,6 @@ export default function ProductCard({
   const outOfStockCount =
     product.variants?.filter((v) => (v.inventory?.quantity || 0) === 0)
       .length || 0;
-  const [showEdit, setShowEdit] = useState(false);
 
   return (
     <motion.div
@@ -53,29 +52,26 @@ export default function ProductCard({
     >
       <Card
         className={`overflow-hidden transition-shadow hover:shadow-md
-          ${product.status === "inactive" ? "opacity-60" : ""}`}
+        flex flex-col
+        ${product.status === "inactive" ? "opacity-60" : ""}`}
       >
         <div className="p-4 md:p-5 space-y-3">
-          {/* ── ROW 1: NAME + ACTIONS ───────────────────────────────────────
-              Product name is the first thing the seller reads
-              Action buttons sit on the right of the same row */}
+          {/* ── ROW 1: NAME + ACTIONS ─────────────────────────────────────── */}
           <div className="flex items-start justify-between gap-2">
-            {/* Left — name, price, description */}
             <div className="min-w-0 flex-1">
-              {/* Name + status badge on same line */}
+              {/* Name + status badge */}
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-sm md:text-base truncate">
                   {product.name}
                 </h3>
-                {/* Active / Inactive pill badge */}
                 <span
                   className={`inline-flex items-center px-2 py-0.5
-                    rounded-full text-xs font-medium flex-shrink-0
-                    ${
-                      product.status === "active"
-                        ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                    }`}
+                  rounded-full text-xs font-medium flex-shrink-0
+                  ${
+                    product.status === "active"
+                      ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                  }`}
                 >
                   {product.status === "active" ? "Active" : "Inactive"}
                 </span>
@@ -86,7 +82,7 @@ export default function ProductCard({
                 ৳{Number(product.base_price).toLocaleString()}
               </p>
 
-              {/* Optional description — one line max */}
+              {/* Description — one line */}
               {product.description && (
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                   {product.description}
@@ -94,16 +90,9 @@ export default function ProductCard({
               )}
             </div>
 
-            {/* Right — Deactivate/Activate + Delete buttons */}
+            {/* Action buttons */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs gap-1 hidden sm:flex"
-                onClick={() => onToggleStatus(product)}
-              >
-                {product.status === "active" ? "Deactivate" : "Activate"}
-              </Button>
+              {/* Edit — opens EditProductModal */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -112,6 +101,20 @@ export default function ProductCard({
               >
                 <Pencil className="w-3 h-3" /> Edit
               </Button>
+
+              {/* Activate / Deactivate
+                  Calls PATCH /products/{id}/status via onToggleStatus
+                  which maps to ProductController@toggleStatus — no body needed */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs hidden sm:flex"
+                onClick={() => onToggleStatus(product)}
+              >
+                {product.status === "active" ? "Deactivate" : "Activate"}
+              </Button>
+
+              {/* Delete */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -123,19 +126,15 @@ export default function ProductCard({
             </div>
           </div>
 
-          {/* ── ROW 2: PRODUCT IMAGES ────────────────────────────────────────
-              Images sit below the name — two small square thumbnails
-              Clicking either opens the fullscreen lightbox
-              If no images uploaded yet, shows a neutral placeholder
-              ProductImageGallery handles all image display logic */}
+          {/* ── ROW 2: PRODUCT IMAGES ───────────────────────────────────────
+              Sits below name — two small thumbnails
+              Clicking opens fullscreen lightbox */}
           <ProductImageGallery
             images={product.images || []}
             productName={product.name}
           />
 
-          {/* ── ROW 3: STOCK SUMMARY ─────────────────────────────────────────
-              Quick numbers below the image — variants count, total stock,
-              and colour-coded warnings for low or out of stock variants */}
+          {/* ── ROW 3: STOCK SUMMARY ──────────────────────────────────────── */}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs text-muted-foreground">
               {product.variants?.length || 0} variant
@@ -157,7 +156,7 @@ export default function ProductCard({
           </div>
         </div>
 
-        {/* ── EXPAND/COLLAPSE VARIANTS TOGGLE ─────────────────────────────── */}
+        {/* ── EXPAND/COLLAPSE VARIANTS ──────────────────────────────────────── */}
         <button
           onClick={() => setExpanded(!expanded)}
           className="w-full flex items-center justify-between
@@ -173,7 +172,7 @@ export default function ProductCard({
           )}
         </button>
 
-        {/* ── VARIANTS TABLE ─────────────────────────────────────────────── */}
+        {/* ── VARIANTS TABLE ────────────────────────────────────────────────── */}
         <AnimatePresence>
           {expanded && (
             <motion.div
@@ -184,19 +183,16 @@ export default function ProductCard({
               className="overflow-hidden"
             >
               <div className="divide-y divide-border">
-                {/* Column headers */}
                 <div
                   className="grid grid-cols-4 px-4 md:px-5 py-2
-                              bg-muted/20 text-xs font-medium
-                              text-muted-foreground"
+                                bg-muted/20 text-xs font-medium
+                                text-muted-foreground"
                 >
                   <span>Variant</span>
                   <span>Price</span>
                   <span>Stock</span>
                   <span>Status</span>
                 </div>
-
-                {/* One row per variant */}
                 {product.variants?.map((variant) => (
                   <div
                     key={variant.id}
@@ -228,6 +224,8 @@ export default function ProductCard({
           )}
         </AnimatePresence>
       </Card>
+
+      {/* Edit Product Modal — rendered outside Card to avoid z-index issues */}
       <AnimatePresence>
         {showEdit && (
           <EditProductModal
@@ -235,6 +233,7 @@ export default function ProductCard({
             onClose={() => setShowEdit(false)}
             onSuccess={() => {
               onSuccess?.();
+              setShowEdit(false);
             }}
           />
         )}

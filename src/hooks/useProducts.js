@@ -1,7 +1,8 @@
-// Custom hook that handles all product data fetching
-// WHY hooks? So Products.jsx doesn't need to know HOW data is fetched
-// The page just calls useProducts() and gets data + actions back
-// If you change the API later, you only change this file
+// src/hooks/useProducts.js
+//
+// deleteProduct no longer uses window.confirm()
+// Instead it accepts an optional external confirm function
+// passed in from the page that uses useConfirmDialog()
 
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
@@ -29,12 +30,23 @@ export default function useProducts() {
     fetchProducts();
   }, [fetchProducts]);
 
-  const deleteProduct = async (id) => {
-    if (!window.confirm("Delete this product? This cannot be undone.")) return;
+  // confirmFn is passed in from the page — it's the confirm() from useConfirmDialog
+  // If not passed, falls back to a simple true (no confirmation)
+  const deleteProduct = async (id, confirmFn) => {
+    if (confirmFn) {
+      const ok = await confirmFn({
+        title: "Delete Product",
+        description:
+          "This will permanently delete the product, all its variants, and stock records. This cannot be undone.",
+        confirmText: "Delete Product",
+        cancelText: "Keep it",
+        type: "danger",
+      });
+      if (!ok) return;
+    }
     try {
       await api.delete(`/products/${id}`);
       setProducts((prev) => prev.filter((p) => p.id !== id));
-      // Remove from local state immediately — no refetch needed
     } catch (err) {
       console.error(err);
     }
@@ -42,9 +54,7 @@ export default function useProducts() {
 
   const toggleStatus = async (product) => {
     try {
-      await api.put(`/products/${product.id}`, {
-        status: product.status === "active" ? "inactive" : "active",
-      });
+      await api.patch(`/products/${product.id}/status`);
       setProducts((prev) =>
         prev.map((p) =>
           p.id === product.id
@@ -53,7 +63,7 @@ export default function useProducts() {
         ),
       );
     } catch (err) {
-      console.error(err);
+      console.error("Toggle status failed:", err);
     }
   };
 
