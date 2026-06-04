@@ -155,6 +155,7 @@ export default function Products() {
               index={index}
               onDelete={deleteProduct}
               onToggleStatus={toggleStatus}
+              onSuccess={fetchProducts}
             />
           ))}
         </div>

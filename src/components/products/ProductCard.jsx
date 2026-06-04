@@ -15,6 +15,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StockBadge from "./StockBadge";
 import ProductImageGallery from "./ProductImageGallery";
+import { Pencil } from "lucide-react";
+import EditProductModal from "./EditProductModal";
 
 export default function ProductCard({
   product,
@@ -41,6 +43,7 @@ export default function ProductCard({
   const outOfStockCount =
     product.variants?.filter((v) => (v.inventory?.quantity || 0) === 0)
       .length || 0;
+  const [showEdit, setShowEdit] = useState(false);
 
   return (
     <motion.div
@@ -100,6 +103,14 @@ export default function ProductCard({
                 onClick={() => onToggleStatus(product)}
               >
                 {product.status === "active" ? "Deactivate" : "Activate"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1.5 hidden sm:flex"
+                onClick={() => setShowEdit(true)}
+              >
+                <Pencil className="w-3 h-3" /> Edit
               </Button>
               <Button
                 variant="ghost"
@@ -217,6 +228,17 @@ export default function ProductCard({
           )}
         </AnimatePresence>
       </Card>
+      <AnimatePresence>
+        {showEdit && (
+          <EditProductModal
+            product={product}
+            onClose={() => setShowEdit(false)}
+            onSuccess={() => {
+              onSuccess?.();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
