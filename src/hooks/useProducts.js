@@ -1,13 +1,9 @@
-// src/hooks/useProducts.js
-//
-// deleteProduct no longer uses window.confirm()
-// Instead it accepts an optional external confirm function
-// passed in from the page that uses useConfirmDialog()
-
 import { useState, useEffect, useCallback } from "react";
+import { useToast } from "@/components/shared/Toast";
 import api from "@/lib/api";
 
 export default function useProducts() {
+  const { showToast } = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,7 +16,11 @@ export default function useProducts() {
       setProducts(res.data.data || res.data);
     } catch (err) {
       setError("Failed to load products");
-      console.error(err);
+      showToast(
+        "Could not load your products. Please refresh the page.",
+        "error",
+        { title: "Loading failed" },
+      );
     } finally {
       setLoading(false);
     }
@@ -30,8 +30,6 @@ export default function useProducts() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // confirmFn is passed in from the page — it's the confirm() from useConfirmDialog
-  // If not passed, falls back to a simple true (no confirmation)
   const deleteProduct = async (id, confirmFn) => {
     if (confirmFn) {
       const ok = await confirmFn({
@@ -47,23 +45,31 @@ export default function useProducts() {
     try {
       await api.delete(`/products/${id}`);
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      showToast("Product deleted successfully.", "success");
     } catch (err) {
-      console.error(err);
+      showToast("Could not delete this product. Please try again.", "error", {
+        title: "Delete failed",
+      });
     }
   };
 
   const toggleStatus = async (product) => {
     try {
       await api.patch(`/products/${product.id}/status`);
+      const newStatus = product.status === "active" ? "inactive" : "active";
       setProducts((prev) =>
         prev.map((p) =>
-          p.id === product.id
-            ? { ...p, status: p.status === "active" ? "inactive" : "active" }
-            : p,
+          p.id === product.id ? { ...p, status: newStatus } : p,
         ),
       );
+      showToast(
+        newStatus === "active"
+          ? `"${product.name}" is now active and available for orders.`
+          : `"${product.name}" is now inactive and hidden from orders.`,
+        "info",
+      );
     } catch (err) {
-      console.error("Toggle status failed:", err);
+      showToast("Could not update product status. Please try again.", "error");
     }
   };
 

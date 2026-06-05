@@ -9,12 +9,14 @@ import StatusBadge, {
   paymentStatusConfig,
 } from "./StatusBadge";
 import api from "@/lib/api";
+import { useToast } from "@/components/shared/Toast";
 
 export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [newStatus, setNewStatus] = useState(order?.order_status);
   const [booking, setBooking] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
+  const { showToast } = useToast();
 
   // Update order status via PATCH /api/orders/{id}/status
   const handleStatusUpdate = async () => {
@@ -25,9 +27,15 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
         order_status: newStatus,
       });
       onStatusUpdate(order.id, newStatus);
+      showToast(
+        `Order #CF-${String(order.id).padStart(4, "0")} updated to ${newStatus}.`,
+        "success",
+      );
       onClose();
     } catch (err) {
-      console.error(err);
+      showToast("Could not update order status. Please try again.", "error", {
+        title: "Update failed",
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -44,12 +52,24 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
         tracking: res.data.tracking_code,
         consignment: res.data.consignment_id,
       });
-      // Update order status to shipped in parent list
       onStatusUpdate(order.id, "shipped");
+      showToast(
+        `SteadFast booked! Tracking number: ${res.data.tracking_code}`,
+        "success",
+        { title: "Shipment booked" },
+      );
     } catch (err) {
+      const message = err.response?.data?.message || "";
+      showToast(
+        message.includes("already")
+          ? "This order already has a SteadFast booking."
+          : "Could not book SteadFast right now. Please try again.",
+        "error",
+        { title: "Booking failed" },
+      );
       setBookingResult({
         success: false,
-        message: err.response?.data?.message || "Booking failed. Try again.",
+        message: "Booking failed. Please try again.",
       });
     } finally {
       setBooking(false);
