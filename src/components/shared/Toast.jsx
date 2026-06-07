@@ -157,8 +157,8 @@ export function ToastProvider({ children }) {
 
 // ── HOOK ──────────────────────────────────────────────────────────────────
 // Call this inside any component to get showToast
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used inside ToastProvider");
-  return ctx;
-}
+// export function useToast() {
+//   const ctx = useContext(ToastContext);
+//   if (!ctx) throw new Error("useToast must be used inside ToastProvider");
+//   return ctx;
+// }
