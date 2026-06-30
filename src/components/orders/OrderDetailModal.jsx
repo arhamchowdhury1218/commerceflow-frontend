@@ -1,5 +1,3 @@
-// src/components/orders/OrderDetailModal.jsx
-
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, Loader2, Truck } from "lucide-react";
@@ -41,20 +39,32 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
     }
   };
 
-  // Book SteadFast consignment for this order
-  const handleBookSteadFast = async () => {
+  // Courier names we have real service integrations for.
+  // The "Book Courier" button only shows for these — orders with
+  // courier_name="own" or "manual" don't go through an API booking flow.
+  const BOOKABLE_COURIERS = ["steadfast", "pathao", "redx"];
+  const courierLabel = (name) =>
+    ({ steadfast: "SteadFast", pathao: "Pathao", redx: "RedX" })[name] || name;
+
+  // Book a courier consignment for this order.
+  // Courier-agnostic — same endpoint, same flow, regardless of which
+  // courier was chosen in the order form (Laravel's resolveCourier()
+  // picks the right service based on order.courier_name).
+  const handleBookCourier = async () => {
     setBooking(true);
     setBookingResult(null);
+    const label = courierLabel(order.courier_name);
     try {
       const res = await api.post(`/deliveries/book/${order.id}`);
       setBookingResult({
         success: true,
         tracking: res.data.tracking_code,
         consignment: res.data.consignment_id,
+        courier: res.data.courier_name,
       });
       onStatusUpdate(order.id, "shipped");
       showToast(
-        `SteadFast booked! Tracking number: ${res.data.tracking_code}`,
+        `${label} booked! Tracking number: ${res.data.tracking_code}`,
         "success",
         { title: "Shipment booked" },
       );
@@ -62,8 +72,8 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
       const message = err.response?.data?.message || "";
       showToast(
         message.includes("already")
-          ? "This order already has a SteadFast booking."
-          : "Could not book SteadFast right now. Please try again.",
+          ? `This order already has a ${label} booking.`
+          : `Could not book ${label} right now. Please try again.`,
         "error",
         { title: "Booking failed" },
       );
@@ -231,11 +241,12 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
             )}
           </div>
 
-          {/* ── STEADFAST BOOKING ────────────────────────────────────────── */}
+          {/* ── COURIER BOOKING ──────────────────────────────────────────── */}
           {/* Show booking button only when:
-              1. Courier is SteadFast
+              1. Courier is one we have an integration for (SteadFast,
+                 Pathao, or RedX) — not "own delivery" or "manual entry"
               2. No consignment has been booked yet */}
-          {order.courier_name === "steadfast" &&
+          {BOOKABLE_COURIERS.includes(order.courier_name) &&
             !order.delivery?.consignment_id &&
             !bookingResult?.success && (
               <div>
@@ -243,10 +254,10 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
                   className="text-xs font-medium text-muted-foreground
                             uppercase tracking-wider mb-2"
                 >
-                  SteadFast Courier
+                  {courierLabel(order.courier_name)} Courier
                 </p>
                 <Button
-                  onClick={handleBookSteadFast}
+                  onClick={handleBookCourier}
                   disabled={booking}
                   className="w-full gap-2"
                   variant="outline"
@@ -257,7 +268,8 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
                     </>
                   ) : (
                     <>
-                      <Truck className="w-4 h-4" /> Book SteadFast Consignment
+                      <Truck className="w-4 h-4" /> Book{" "}
+                      {courierLabel(order.courier_name)} Consignment
                     </>
                   )}
                 </Button>
@@ -276,7 +288,7 @@ export default function OrderDetailModal({ order, onClose, onStatusUpdate }) {
                 className="text-xs font-medium text-green-700
                             dark:text-green-300 mb-1"
               >
-                SteadFast Booked
+                {courierLabel(order.delivery.courier_name)} Booked
               </p>
               <p
                 className="text-sm font-mono font-bold text-green-800
